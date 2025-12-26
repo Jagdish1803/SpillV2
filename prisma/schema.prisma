@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String    @unique
+  username      String?   @unique
+  firstName     String?
+  lastName      String?
+  imageUrl      String?
+  bio           String?
+  status        String?   @default("online") // online, offline, away, busy
+  lastSeen      DateTime  @default(now())
+  isActive      Boolean   @default(true)
+  metadata      Json?     // Store flexible data like preferences, settings, etc.
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  conversations    ConversationParticipant[]
+  typingEvents     TypingEvent[]
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  type          String    @default("direct") // direct, group, channel
+  name          String?
+  description   String?
+  imageUrl      String?
+  isArchived    Boolean   @default(false)
+  metadata      Json?     // For custom conversation data
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  participants  ConversationParticipant[]
+  messages      Message[]
+}
+
+model ConversationParticipant {
+  id              String    @id @default(cuid())
+  conversationId  String
+  userId          String
+  role            String    @default("member") // admin, moderator, member
+  joinedAt        DateTime  @default(now())
+  lastReadAt      DateTime  @default(now())
+  isMuted         Boolean   @default(false)
+  isPinned        Boolean   @default(false)
+  metadata        Json?
+  
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  content         String
+  senderId        String
+  receiverId      String?   // For direct messages (backward compatibility)
+  conversationId  String?   // For group/channel messages
+  type            String    @default("text") // text, image, file, audio, video, system
+  fileUrl         String?
+  fileName        String?
+  fileSize        Int?
+  replyToId       String?   // For threaded replies
+  isEdited        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  read            Boolean   @default(false)
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  metadata        Json?     // For reactions, mentions, custom data
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  sender          User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver        User?         @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo         Message?      @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[]     @relation("MessageReplies")
+  
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([replyToId])
+}
+
+model TypingEvent {
+  id              String    @id @default(cuid())
+  userId          String
+  conversationId  String
+  isTyping        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, conversationId])
+  @@index([conversationId])
+}
