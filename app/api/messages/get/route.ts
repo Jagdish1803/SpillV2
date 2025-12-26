@@ -1,9 +1,21 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import type { Message, User } from '@prisma/client'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
+
+// Type for message with included sender
+type MessageWithSender = Message & {
+  sender: {
+    id: string
+    clerkId: string
+    firstName: string | null
+    lastName: string | null
+    imageUrl: string | null
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,7 +67,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Transform messages to match frontend format
-    const transformedMessages = messages.map(message => ({
+    const transformedMessages = messages.map((message: MessageWithSender) => ({
       id: message.id,
       content: message.content,
       senderId: message.sender.clerkId,
